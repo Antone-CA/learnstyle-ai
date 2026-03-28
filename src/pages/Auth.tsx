@@ -31,7 +31,7 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex pt-16">
-      {/* Left - Image Panel */}
+      {}
       <div className="hidden lg:flex lg:w-1/2 relative">
         <img src={authLibrary} alt="Modern library" className="absolute inset-0 h-full w-full object-cover" loading="lazy" width={640} height={960} />
         <div className="absolute inset-0 gradient-hero opacity-70" />
@@ -45,7 +45,7 @@ const Auth = () => {
         </div>
       </div>
 
-      {/* Right - Auth Form */}
+      {}
       <div className="flex flex-1 items-center justify-center p-8 bg-background">
         <Card className="w-full max-w-md shadow-elevated border-border">
           <CardHeader className="text-center">
