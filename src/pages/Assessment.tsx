@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -129,7 +129,7 @@ const Assessment = () => {
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(new Array(questions.length).fill(null));
   const [processing, setProcessing] = useState(false);
-  const { updateProfile, isLoggedIn } = useAuth();
+  const { completeAssessment, isLoggedIn } = useAuth();
   const navigate = useNavigate();
 
   // Shuffle questions once on mount
@@ -169,7 +169,7 @@ const Assessment = () => {
   const finishAssessment = () => {
     setProcessing(true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const scores: Record<Category, number> = { Visual: 0, Auditory: 0, 'Read/Write': 0, Kinesthetic: 0 };
       shuffled.forEach((q, i) => {
         const picked = answers[i];
@@ -180,16 +180,14 @@ const Assessment = () => {
 
       const total = Object.values(scores).reduce((a, b) => a + b, 0);
       const best = (Object.entries(scores) as [Category, number][]).sort((a, b) => b[1] - a[1])[0];
-      const confidence = total > 0 ? Math.round((best[1] / total) * 100) : 0;
+      const matchPercentage = total > 0 ? Math.round((best[1] / total) * 100) : 0;
+      const score = Math.round((matchPercentage + 50) / 1.5); // Scale to 0-100
 
-      updateProfile({
-        learningStyle: best[0],
-        confidenceScore: confidence,
-        assessmentDate: new Date().toISOString().split('T')[0],
-        assessmentHistory: [{ date: new Date().toISOString().split('T')[0], style: best[0], score: confidence }],
-      });
+      await completeAssessment(best[0], scores, matchPercentage, score);
 
-      navigate('/dashboard');
+      setTimeout(() => {
+        navigate('/dashboard/student');
+      }, 1200);
     }, 3000);
   };
 
