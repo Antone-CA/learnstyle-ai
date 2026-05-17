@@ -9,10 +9,12 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getToken();
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -35,8 +37,10 @@ async function request<T>(
     throw new Error(err.detail || JSON.stringify(err));
   }
 
-  // 204 No Content
-  if (res.status === 204) return undefined as unknown as T;
+  if (res.status === 204) {
+    return undefined as unknown as T;
+  }
+
   return res.json() as Promise<T>;
 }
 
@@ -54,8 +58,17 @@ export interface APIUser {
   streak?: number;
   lessons_completed?: number;
   course_completion?: number;
-  varkScores?: { Visual: number; Auditory: number; 'Read/Write': number; Kinesthetic: number };
-  assessmentHistory?: { date: string; style: string; score: number }[];
+  varkScores?: {
+    Visual: number;
+    Auditory: number;
+    'Read/Write': number;
+    Kinesthetic: number;
+  };
+  assessmentHistory?: {
+    date: string;
+    style: string;
+    score: number;
+  }[];
   section?: string;
   is_active_account?: boolean;
 }
@@ -68,52 +81,99 @@ export interface AuthResponse {
 
 export interface StudentDashboardData {
   profile: APIUser;
-  weeklyActivity: { day: string; assessments: number }[];
+  weeklyActivity: {
+    day: string;
+    assessments: number;
+  }[];
+}
+
+export interface InstructorDashboardStudent {
+  id: number;
+  name: string;
+  email: string;
+  style: string | null;
+  assessmentDate: string | null;
+  last_score: number;
+  section: string;
 }
 
 export interface InstructorDashboardData {
   studentCount: number;
   avgScore: number;
-  students: {
-    id: number;
+  students: InstructorDashboardStudent[];
+  classDistribution: {
     name: string;
-    email: string;
-    style: string | null;
-    assessmentDate: string | null;
-    last_score: number;
-    section: string;
+    value: number;
   }[];
-  classDistribution: { name: string; value: number }[];
-  weeklyActivity: { day: string; assessments: number }[];
+  weeklyActivity: {
+    day: string;
+    assessments: number;
+  }[];
+}
+
+export interface AdminDashboardUser {
+  id: number;
+  name: string;
+  email: string;
+  role: 'student' | 'instructor' | 'admin';
+  section: string;
+  instructor_id: number | null;
+  is_active_account: boolean;
 }
 
 export interface AdminDashboardData {
-  users: {
-    id: number;
-    name: string;
-    email: string;
-    role: 'student' | 'instructor' | 'admin';
-    section: string;
-    instructor_id: number | null;
-    is_active_account: boolean;
-  }[];
+  users: AdminDashboardUser[];
   totalAssessments: number;
-  weeklySystemActivity: { day: string; logins: number; assessments: number }[];
+  weeklySystemActivity: {
+    day: string;
+    logins: number;
+    assessments: number;
+  }[];
+}
+
+export interface AssessmentHistoryItem {
+  id: number;
+  learning_style: string;
+  match_percentage: number;
+  score: number;
+  vark_visual: number;
+  vark_auditory: number;
+  vark_readwrite: number;
+  vark_kinesthetic: number;
+  taken_at: string;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const authAPI = {
-  login: (email: string, password: string) =>
+  login: (
+    email: string,
+    password: string,
+    role: 'student' | 'instructor' | 'admin'
+  ) =>
     request<AuthResponse>('/auth/login/', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({
+        email,
+        password,
+        role,
+      }),
     }),
 
-  register: (name: string, email: string, password: string, role: string) =>
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    role: 'student' | 'instructor' | 'admin'
+  ) =>
     request<AuthResponse>('/auth/register/', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, role }),
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        role,
+      }),
     }),
 };
 
@@ -121,8 +181,12 @@ export const authAPI = {
 
 export const profileAPI = {
   get: () => request<APIUser>('/profile/'),
+
   patch: (data: Partial<APIUser>) =>
-    request<APIUser>('/profile/', { method: 'PATCH', body: JSON.stringify(data) }),
+    request<APIUser>('/profile/', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
 };
 
 // ─── Assessment ───────────────────────────────────────────────────────────────
@@ -139,9 +203,8 @@ export const assessmentAPI = {
       body: JSON.stringify(payload),
     }),
 
-  history: () => request<{ id: number; learning_style: string; score: number; taken_at: string }[]>(
-    '/assessment/history/'
-  ),
+  history: () =>
+    request<AssessmentHistoryItem[]>('/assessment/history/'),
 };
 
 // ─── Dashboards ───────────────────────────────────────────────────────────────
@@ -156,7 +219,7 @@ export const dashboardAPI = {
 
 export const adminAPI = {
   updateUser: (userId: number, data: Record<string, unknown>) =>
-    request<AdminDashboardData['users'][0]>(`/admin/users/${userId}/`, {
+    request<AdminDashboardUser>(`/admin/users/${userId}/`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),

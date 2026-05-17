@@ -4,10 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
 import {
-  Users, Activity, ShieldCheck, UserPlus, Search, Layers3, BarChart3
+  Users, Activity, ShieldCheck, UserPlus, Search, Layers3, BarChart3, Plus
 } from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -37,8 +40,15 @@ const AdminDashboard = () => {
   const [apiData, setApiData] = useState<AdminDashboardData | null>(null);
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [query, setQuery] = useState('');
-  const [assignStudentId, setAssignStudentId] = useState('');
-  const [assignInstructorId, setAssignInstructorId] = useState('');
+  const [assignInstructorSection, setAssignInstructorSection] = useState('');
+  const [assignSectionInstructorId, setAssignSectionInstructorId] = useState('');
+  const [assignStudentToSectionId, setAssignStudentToSectionId] = useState('');
+  const [assignSectionName, setAssignSectionName] = useState('');
+  const [openCreateSection, setOpenCreateSection] = useState(false);
+  const [createSectionName, setCreateSectionName] = useState('');
+  const [createSectionInstructor, setCreateSectionInstructor] = useState('none');
+  const [createSectionStatus, setCreateSectionStatus] = useState('active');
+  const [createSectionCapacity, setCreateSectionCapacity] = useState('');
 
   useEffect(() => {
     dashboardAPI.admin().then((data) => {
@@ -72,6 +82,47 @@ const AdminDashboard = () => {
     [users, query]
   );
 
+const sectionSummaries = useMemo(() => {
+  const sectionNames = Array.from(
+    new Set(
+      [
+        ...instructors.map((i) => i.section).filter(Boolean),
+        ...students.map((s) => s.section).filter(Boolean),
+      ]
+        .map((name) => name.trim())
+        .filter(Boolean)
+    )
+  );
+
+  return sectionNames.map((section) => {
+    const instructor =
+      instructors.find((i) => i.section === section) ?? null;
+
+    const sectionStudents = students.filter(
+      (s) =>
+        s.section === section &&
+        s.name !== '__section_placeholder__'
+    );
+
+    return {
+      section,
+      instructor,
+      students: sectionStudents,
+      isActive: Boolean(instructor),
+    };
+  });
+}, [instructors, students]);
+
+  const sectionNames = sectionSummaries.map((s) => s.section);
+  const availableStudents = students.filter(
+  (s) =>
+    s.role === 'student' &&
+    s.name !== '__section_placeholder__'
+  );
+  const availableInstructors = instructors.filter((i) => i.role === 'instructor');
+  const unassignedStudents = availableStudents.filter((s) => !s.section?.trim());
+  const unassignedInstructors = availableInstructors.filter((i) => !i.section?.trim());
+
   const roleDistribution = useMemo(
     () => [
       { name: 'Students', value: students.length, color: ROLE_COLORS.student },
@@ -100,12 +151,175 @@ const AdminDashboard = () => {
     });
   };
 
-  const assignStudentToInstructor = () => {
-    if (!assignStudentId || !assignInstructorId) return;
-    adminAPI.updateUser(Number(assignStudentId), { instructorId: Number(assignInstructorId) }).then((updated) => {
-      setUsers((prev) => prev.map((u) => (u.id === Number(assignStudentId) ? { ...u, ...updated } : u)));
-    }).catch(() => {});
+const createSection = async () => {
+  if (!createSectionName.trim()) {
+    toast({
+      title: 'Error',
+      description: 'Section name is required.',
+    });
+    return;
+  }
+
+  const instructorId =
+    createSectionInstructor &&
+    createSectionInstructor !== 'none'
+      ? Number(createSectionInstructor)
+      : null;
+
+  try {
+    if (instructorId) {
+      await adminAPI.updateUser(instructorId, {
+        section: createSectionName,
+      });
+    }
+
+    setUsers((prev) => {
+      let updatedUsers = prev.map((u) => {
+        if (instructorId && u.id === instructorId) {
+          return {
+            ...u,
+            section: createSectionName,
+          };
+        }
+
+        return u;
+      });
+
+      if (!updatedUsers.some((u) => u.section === createSectionName)) {
+        updatedUsers.push({
+          id: Date.now(),
+          name: '__section_placeholder__',
+          email: 'placeholder@section.local',
+          role: 'student',
+          section: createSectionName,
+          instructor_id: null,
+          is_active_account: false,
+        } as ManagedUser);
+      }
+
+      return updatedUsers;
+    });
+
+    setOpenCreateSection(false);
+    setCreateSectionName('');
+    setCreateSectionInstructor('none');
+    setCreateSectionStatus('active');
+    setCreateSectionCapacity('');
+
+    toast({
+      title: 'Section created',
+      description: `Section "${createSectionName}" created successfully.`,
+    });
+  } catch (error) {
+};
+    try {
+      if (instructorId) {
+        await adminAPI.updateUser(instructorId, { section: createSectionName });
+      }
+
+      setUsers((prev) =>
+        prev.map((u) => {
+          if (instructorId && u.id === instructorId) {
+            return { ...u, section: createSectionName };
+          }
+          return u;
+        })
+      );
+
+      setOpenCreateSection(false);
+      setCreateSectionName('');
+      setCreateSectionInstructor('');
+      setCreateSectionStatus('active');
+      setCreateSectionCapacity('');
+
+      toast({ title: 'Section created', description: `Section "${createSectionName}" created successfully.` });
+    } catch (error) {
+      console.error('Failed to create section', error);
+      toast({ title: 'Creation failed', description: 'Unable to create the section.' });
+    }
   };
+
+  const assignInstructorToSection = async () => {
+    if (!assignInstructorSection || !assignSectionInstructorId) return;
+
+    const section = assignInstructorSection;
+    const instructorId = Number(assignSectionInstructorId);
+    const previousUsers = users;
+
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.role === 'instructor') {
+          if (u.id === instructorId) {
+            return { ...u, section };
+          }
+
+          if (u.section === section) {
+            return { ...u, section: '' };
+          }
+        }
+
+        if (u.role === 'student' && u.section === section) {
+          return { ...u, instructor_id: instructorId };
+        }
+
+        return u;
+      })
+    );
+
+    try {
+      const updated = await adminAPI.updateUser(instructorId, { section });
+      setUsers((prev) =>
+        prev.map((u) => (u.id === instructorId ? { ...u, ...updated } : u))
+      );
+      setAssignInstructorSection('');
+      setAssignSectionInstructorId('');
+      toast({ title: 'Instructor assigned', description: `Instructor assigned to ${section}.` });
+    } catch (error) {
+      console.error('Failed to assign instructor to section', error);
+      setUsers(previousUsers);
+      toast({ title: 'Assignment failed', description: 'Unable to assign the instructor to the section.' });
+    }
+  };
+
+  const enrollStudentToSection = async () => {
+    if (!assignStudentToSectionId || !assignSectionName) return;
+
+    const studentId = Number(assignStudentToSectionId);
+    const section = assignSectionName;
+    const sectionInstructor = sectionSummaries.find((s) => s.section === section)?.instructor;
+    const previousUsers = users;
+
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === studentId
+          ? {
+              ...u,
+              section,
+              instructor_id: sectionInstructor?.id ?? null,
+            }
+          : u
+      )
+    );
+
+    try {
+      const updated = await adminAPI.updateUser(studentId, {
+        section,
+        instructor_id: sectionInstructor?.id ?? null,
+      });
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === studentId ? { ...u, ...updated } : u))
+      );
+      setAssignStudentToSectionId('');
+      setAssignSectionName('');
+      toast({ title: 'Student enrolled', description: `${updated.name} enrolled to ${section}.` });
+    } catch (error) {
+      console.error('Failed to enroll student to section', error);
+      setUsers(previousUsers);
+      toast({ title: 'Enrollment failed', description: 'Unable to enroll the student in the section.' });
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -234,58 +448,201 @@ const AdminDashboard = () => {
             </TabsContent>
 
             <TabsContent value="assignment">
-              <div className="space-y-4">
-                <h3 className="font-semibold text-[#1f2937]">Assign Students to Instructors</h3>
-                <div className="grid md:grid-cols-3 gap-3 items-end">
-                  <div className="space-y-2">
-                    <Label>Student</Label>
-                    <Select value={assignStudentId} onValueChange={setAssignStudentId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select student" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {students.map((s) => (
-                          <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Instructor</Label>
-                    <Select value={assignInstructorId} onValueChange={setAssignInstructorId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select instructor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {instructors.map((i) => (
-                          <SelectItem key={i.id} value={String(i.id)}>{i.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button className="gradient-primary text-white" onClick={assignStudentToInstructor}>Assign</Button>
-                </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card className="shadow-card border">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Assign Instructor to Section</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Section</Label>
+                      <Select value={assignInstructorSection} onValueChange={setAssignInstructorSection}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a section" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sectionNames.map((section) => (
+                            <SelectItem key={section} value={section}>{section}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Instructor</Label>
+                      <Select value={assignSectionInstructorId} onValueChange={setAssignSectionInstructorId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an instructor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableInstructors.map((i) => (
+                            <SelectItem key={i.id} value={String(i.id)}>{i.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button className="gradient-primary text-white w-full" onClick={assignInstructorToSection}>
+                      Assign Instructor
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-card border">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Enroll Student to Section</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Student</Label>
+                      <Select value={assignStudentToSectionId} onValueChange={setAssignStudentToSectionId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a student" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableStudents.map((s) => (
+                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Section</Label>
+                      <Select value={assignSectionName} onValueChange={setAssignSectionName}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a section" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sectionNames.map((section) => (
+                            <SelectItem key={section} value={section}>{section}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button className="gradient-primary text-white w-full" onClick={enrollStudentToSection}>
+                      Enroll Student
+                    </Button>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
 
             <TabsContent value="sections">
-              <div className="space-y-3">
-                {instructors.map((instructor) => {
-                  const sectionStudents = students.filter((s) => s.instructor_id === instructor.id);
-                  return (
-                    <div key={instructor.id} className="p-3 border rounded-lg flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-[#1f2937]">{instructor.section || 'No Section'}</p>
-                        <p className="text-xs text-[#6b7280]">
-                          Instructor: {instructor.name} • Students: {sectionStudents.length}
-                        </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[#1f2937]">Sections ({sectionSummaries.length})</p>
+                  </div>
+                  <Dialog open={openCreateSection} onOpenChange={setOpenCreateSection}>
+                    <DialogTrigger asChild>
+                      <Button className="gradient-primary text-white gap-2">
+                        <Plus className="h-4 w-4" />
+                        Create Section
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create New Section</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="section-name">Section Name</Label>
+                          <Input
+                            id="section-name"
+                            placeholder="e.g., BSIT-r1"
+                            value={createSectionName}
+                            onChange={(e) => setCreateSectionName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="section-instructor">Assign Instructor (Optional)</Label>
+                          <Select value={createSectionInstructor} onValueChange={setCreateSectionInstructor}>
+                            <SelectTrigger id="section-instructor">
+                              <SelectValue placeholder="Select an instructor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {availableInstructors.map((i) => (
+                                <SelectItem key={i.id} value={String(i.id)}>{i.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="section-status">Status</Label>
+                          <Select value={createSectionStatus} onValueChange={setCreateSectionStatus}>
+                            <SelectTrigger id="section-status">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex gap-2 justify-end pt-4">
+                          <Button variant="outline" onClick={() => setOpenCreateSection(false)}>
+                            Cancel
+                          </Button>
+                          <Button className="gradient-primary text-white" onClick={createSection}>
+                            Create Section
+                          </Button>
+                        </div>
                       </div>
-                      <Badge variant="secondary">Active</Badge>
-                    </div>
-                  );
-                })}
-                {instructors.length === 0 && (
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                {sectionSummaries.length === 0 ? (
                   <p className="text-sm text-[#6b7280]">No sections found.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {sectionSummaries.map((section) => (
+                      <Card key={section.section} className="border">
+                        <CardContent className="pt-6">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="font-semibold text-[#1f2937]">{section.section}</p>
+                              <Badge className={section.isActive ? 'bg-[#10b981] text-white' : 'bg-[#f97316] text-white'}>
+                                {section.isActive ? 'Active' : 'Pending'}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-[#6b7280]">
+                              Instructor: {section.instructor?.name ?? 'Unassigned'}
+                            </p>
+                            <p className="text-sm text-[#6b7280]">
+                              Students: {section.students.length}
+                            </p>
+                            {section.students.length > 0 && (
+                              <ul className="mt-3 space-y-1 text-sm">
+                                {section.students.map((s) => (
+                                  <li key={s.id} className="text-[#6b7280]">• {s.name}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {(unassignedStudents.length > 0 || unassignedInstructors.length > 0) && (
+                  <Card className="border border-dashed bg-slate-50">
+                    <CardContent className="pt-6">
+                      <p className="text-sm font-semibold text-[#1f2937] mb-3">Unassigned Users</p>
+                      {unassignedInstructors.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-xs text-[#6b7280] mb-1">Instructors:</p>
+                          <p className="text-sm text-[#1f2937]">{unassignedInstructors.map((i) => i.name).join(', ')}</p>
+                        </div>
+                      )}
+                      {unassignedStudents.length > 0 && (
+                        <div>
+                          <p className="text-xs text-[#6b7280] mb-1">Students:</p>
+                          <p className="text-sm text-[#1f2937]">{unassignedStudents.map((s) => s.name).join(', ')}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
               </div>
             </TabsContent>

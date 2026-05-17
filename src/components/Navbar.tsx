@@ -85,18 +85,13 @@ const Navbar = () => {
               </DropdownMenu>
             </>
           ) : (
-            <>
-              <Link to="/auth?mode=login">
-                <Button variant="ghost" size="sm">
-                  Login
-                </Button>
-              </Link>
-              <Link to="/auth?mode=signup">
-                <Button size="sm" className="gradient-primary text-primary-foreground">
-                  Sign Up
-                </Button>
-              </Link>
-            </>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/auth?mode=login')}
+            >
+              Sign In
+            </Button>
           )}
         </div>
       </div>

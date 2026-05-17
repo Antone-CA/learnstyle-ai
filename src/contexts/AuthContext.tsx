@@ -22,11 +22,25 @@ interface AuthContextType {
   isLoggedIn: boolean;
   user: UserProfile | null;
   accounts: UserProfile[];
-  login: (email: string, password: string) => Promise<UserProfile | null>;
-  signup: (name: string, email: string, password: string, role: UserProfile['role']) => Promise<UserProfile | null>;
+  login: (
+  email: string,
+  password: string,
+  role: 'student' | 'instructor' | 'admin'
+) => Promise<UserProfile | null>;
+  signup: (
+    name: string,
+    email: string,
+    password: string,
+    role: UserProfile['role']
+  ) => Promise<UserProfile | null>;
   logout: () => void;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
-  completeAssessment: (learningStyle: string, varkScores: Record<string, number>, matchPercentage: number, score: number) => Promise<void>;
+  completeAssessment: (
+    learningStyle: string,
+    varkScores: Record<string, number>,
+    matchPercentage: number,
+    score: number
+  ) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -145,26 +159,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const savedUser = localStorage.getItem('currentUser');
     const token = localStorage.getItem('access_token');
+
     if (savedUser && token) {
       setUser(JSON.parse(savedUser));
-      profileAPI.get().then(apiUser => {
-        const profile = apiUserToProfile(apiUser);
-        setUser(profile);
-        localStorage.setItem('currentUser', JSON.stringify(profile));
-      }).catch(() => {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('currentUser');
-        setUser(null);
-      });
+
+      profileAPI.get()
+        .then((apiUser) => {
+          const profile = apiUserToProfile(apiUser);
+          setUser(profile);
+          localStorage.setItem('currentUser', JSON.stringify(profile));
+        })
+        .catch(() => {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('currentUser');
+          setUser(null);
+        });
     }
   }, []);
 
-  const login = async (email: string, password: string): Promise<UserProfile | null> => {
-    try {
-      const res = await authAPI.login(email, password);
+  const login = async (
+        email: string,
+        password: string,
+        role: 'student' | 'instructor' | 'admin'
+): Promise<UserProfile | null> => {    try {
+      const res = await authAPI.login(email, password, role);
       localStorage.setItem('access_token', res.access);
       localStorage.setItem('refresh_token', res.refresh);
+
       const profile = apiUserToProfile(res.user);
       setUser(profile);
       localStorage.setItem('currentUser', JSON.stringify(profile));
@@ -172,9 +194,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       const message = getErrorMessage(error);
       const localAccounts = readLocalAccounts();
-      const localAccount = localAccounts.find(
-        (a) => a.email.toLowerCase() === email.toLowerCase() && a.password === password
-      );
+
+const localAccount = localAccounts.find(
+  (a) =>
+    a.email.toLowerCase() === email.toLowerCase() &&
+    a.password === password &&
+    a.role === role
+);
 
       if (localAccount) {
         const profile = toUserProfile(localAccount);
@@ -193,17 +219,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const signup = async (name: string, email: string, password: string, role: UserProfile['role']): Promise<UserProfile | null> => {
+       const signup = async (
+         name: string,
+         email: string,
+         password: string,
+         role: 'student' | 'instructor' | 'admin'
+  ): Promise<UserProfile | null> => {
     try {
       const res = await authAPI.register(name, email, password, role);
       localStorage.setItem('access_token', res.access);
       localStorage.setItem('refresh_token', res.refresh);
+
       const profile = apiUserToProfile(res.user);
       setUser(profile);
       localStorage.setItem('currentUser', JSON.stringify(profile));
       return profile;
     } catch (error) {
       const message = getErrorMessage(error);
+
       if (!isNetworkError(message)) {
         throw new Error(message);
       }
@@ -212,6 +245,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const exists = localAccounts.some(
         (account) => account.email.toLowerCase() === email.toLowerCase()
       );
+
       if (exists) {
         throw new Error('Email is already registered.');
       }
@@ -226,6 +260,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lessonsCompleted: 0,
         courseCompletion: 0,
       };
+
       const nextAccounts = [...localAccounts, newAccount];
       writeLocalAccounts(nextAccounts);
       setAccounts(nextAccounts.map(toUserProfile));
@@ -248,8 +283,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updateProfile = async (updates: Partial<UserProfile>): Promise<void> => {
     if (!user) return;
+
     const backendUpdates: Record<string, unknown> = {};
-    if (updates.name !== undefined) backendUpdates['first_name'] = updates.name.split(' ')[0];
     if (updates.streak !== undefined) backendUpdates['streak'] = updates.streak;
     if (updates.lessonsCompleted !== undefined) backendUpdates['lessons_completed'] = updates.lessonsCompleted;
     if (updates.courseCompletion !== undefined) backendUpdates['course_completion'] = updates.courseCompletion;
@@ -273,12 +308,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     score: number
   ): Promise<void> => {
     try {
-      const apiUser = await assessmentAPI.submit({ learningStyle, matchPercentage, score, varkScores });
+      const apiUser = await assessmentAPI.submit({
+        learningStyle,
+        matchPercentage,
+        score,
+        varkScores,
+      });
+
       const updated = apiUserToProfile(apiUser);
       setUser(updated);
       localStorage.setItem('currentUser', JSON.stringify(updated));
     } catch {
       if (!user) return;
+
       const updated: UserProfile = {
         ...user,
         learningStyle: learningStyle as UserProfile['learningStyle'],
@@ -287,22 +329,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         assessmentDate: new Date().toISOString().split('T')[0],
         varkScores: varkScores as UserProfile['varkScores'],
       };
+
       setUser(updated);
       localStorage.setItem('currentUser', JSON.stringify(updated));
     }
   };
 
   return (
-    <AuthContext.Provider value={{
-      isLoggedIn: !!user,
-      user,
-      accounts,
-      login,
-      signup,
-      logout,
-      updateProfile,
-      completeAssessment,
-    }}>
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: !!user,
+        user,
+        accounts,
+        login,
+        signup,
+        logout,
+        updateProfile,
+        completeAssessment,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

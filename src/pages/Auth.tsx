@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, Lightbulb, AlertCircle } from 'lucide-react';
 import authLibrary from '@/assets/auth-library.jpg';
@@ -37,7 +38,7 @@ const Auth = () => {
       let authenticatedUser: { role: 'student' | 'instructor' | 'admin' } | null = null;
 
       if (isLogin) {
-        authenticatedUser = await login(email, password);
+        authenticatedUser = await login(email, password, role);
         if (!authenticatedUser) {
           setError('Invalid email or password');
         }
@@ -128,34 +129,26 @@ const Auth = () => {
                   </button>
                 </div>
               </div>
-              {!isLogin && (
-                <div>
-                  <Label>Role</Label>
-                  <div className="mt-2 flex rounded-lg border border-border overflow-hidden">
-                    {(['student', 'instructor', 'admin'] as const).map(r => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setRole(r)}
-                        className={`flex-1 py-2.5 text-sm font-medium capitalize transition-colors ${
-                          role === r
-                            ? 'gradient-primary text-primary-foreground'
-                            : 'bg-background text-muted-foreground hover:bg-muted'
-                        }`}
-                      >
-                        {r === 'student' ? '👤 Student' : r === 'instructor' ? '🧑‍🏫 Instructor' : '⚙️ Admin'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div>
+                <Label>Role</Label>
+                <Select value={role} onValueChange={(value) => setRole(value as 'student' | 'instructor' | 'admin')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="student"> Student</SelectItem>
+                    <SelectItem value="instructor"> Instructor</SelectItem>
+                    <SelectItem value="admin"> Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <Button
                 type="submit"
                 disabled={isLoading}
                 className="w-full gradient-primary text-primary-foreground font-semibold"
               >
-                {isLoading ? 'Loading...' : isLogin ? 'Sign In' : 'Sign Up'}
+                {isLoading ? 'Loading...' : isLogin ? 'Login' : 'Sign Up'}
               </Button>
 
               {error && (
