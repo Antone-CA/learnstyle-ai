@@ -38,8 +38,8 @@ interface AuthContextType {
   completeAssessment: (
     learningStyle: string,
     varkScores: Record<string, number>,
-    matchPercentage: number,
-    score: number
+    percentages: Record<string, number>,
+    matchPercentage: number
   ) => Promise<void>;
 }
 
@@ -304,9 +304,11 @@ const localAccount = localAccounts.find(
   const completeAssessment = async (
     learningStyle: string,
     varkScores: Record<string, number>,
-    matchPercentage: number,
-    score: number
+    percentages: Record<string, number>,
+    matchPercentage: number
   ): Promise<void> => {
+    const score = matchPercentage;
+
     try {
       const apiUser = await assessmentAPI.submit({
         learningStyle,
@@ -325,9 +327,8 @@ const localAccount = localAccounts.find(
         ...user,
         learningStyle: learningStyle as UserProfile['learningStyle'],
         matchPercentage,
-        lastScore: score,
         assessmentDate: new Date().toISOString().split('T')[0],
-        varkScores: varkScores as UserProfile['varkScores'],
+        varkScores: percentages as UserProfile['varkScores'],
       };
 
       setUser(updated);

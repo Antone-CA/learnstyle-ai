@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
-  TrendingUp, Flame, BookOpen, Zap, AlertCircle, ClipboardList
+  TrendingUp, Flame, BookOpen, Zap, AlertCircle, PieChart
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -100,12 +100,12 @@ const StudentDashboard = () => {
                     <p className="font-bold text-lg text-[#1f2937]">{user.learningStyle}</p>
                     <p className="text-sm text-[#6b7280]">Your detected learning style</p>
                   </div>
-                  <Badge className="bg-[#1d4ed8] text-white">{user.matchPercentage}%</Badge>
+                  <Badge className="bg-[#1d4ed8] text-white">{user.matchPercentage ?? 0}%</Badge>
                 </div>
                 <div>
                   <div className="flex justify-between mb-2">
                     <span className="text-sm text-[#6b7280]">Match Confidence</span>
-                    <span className="font-semibold text-[#1f2937]">{user.matchPercentage}%</span>
+                    <span className="font-semibold text-[#1f2937]">{user.matchPercentage ?? 0}%</span>
                   </div>
                   <Progress value={user.matchPercentage || 0} className="h-2 bg-[#e5e7eb]" />
                 </div>
@@ -176,7 +176,7 @@ const StudentDashboard = () => {
         </Card>
       </motion.div>
 
-      {/* Assessment Card */}
+      {/* Learning Style Distribution */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -184,33 +184,46 @@ const StudentDashboard = () => {
       >
         <Card className="shadow-elevated">
           <CardHeader>
-            <CardTitle>🎯 Latest Assessment</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <PieChart className="h-5 w-5 text-[#1d4ed8]" />
+              Learning Style Distribution
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {user?.lastScore ? (
-              <>
-                <div>
-                  <p className="text-[#6b7280] text-sm mb-2">Last Score</p>
-                  <p className="font-display text-2xl font-bold text-[#1d4ed8]">{user.lastScore}%</p>
-                  <p className="text-xs text-[#6b7280] mt-1">Taken on {user.assessmentDate}</p>
-                </div>
+            {user?.varkScores ? (
+              <div className="space-y-5">
+                <p className="text-sm text-[#6b7280]">
+                  This distribution is based on your latest VARK assessment results.
+                </p>
+
+                {[
+                  { label: 'Visual', value: user.varkScores.Visual },
+                  { label: 'Auditory', value: user.varkScores.Auditory },
+                  { label: 'Read/Write', value: user.varkScores['Read/Write'] },
+                  { label: 'Kinesthetic', value: user.varkScores.Kinesthetic },
+                ].map((item) => (
+                  <div key={item.label} className="space-y-2">
+                    <div className="flex justify-between text-sm text-[#6b7280]">
+                      <span>{item.label}</span>
+                      <span className="font-semibold text-[#1f2937]">{item.value}%</span>
+                    </div>
+                    <Progress value={item.value} className="h-2 bg-[#e5e7eb]" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-[#6b7280] mb-4">
+                  Complete your VARK assessment to reveal your style distribution.
+                </p>
                 <Button
                   onClick={() => navigate('/assessment')}
-                  variant="outline"
-                  className="w-full"
+                  className="w-full gradient-primary text-white"
                 >
                   <Zap className="h-4 w-4 mr-2" />
-                  Retake Assessment
+                  Start Assessment
                 </Button>
-              </>
-            ) : (
-              <Button
-                onClick={() => navigate('/assessment')}
-                className="w-full gradient-primary text-white"
-              >
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Start Assessment
-              </Button>
+              </div>
             )}
           </CardContent>
         </Card>

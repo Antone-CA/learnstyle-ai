@@ -179,11 +179,35 @@ const Assessment = () => {
       });
 
       const total = Object.values(scores).reduce((a, b) => a + b, 0);
-      const best = (Object.entries(scores) as [Category, number][]).sort((a, b) => b[1] - a[1])[0];
-      const matchPercentage = total > 0 ? Math.round((best[1] / total) * 100) : 0;
-      const score = Math.round((matchPercentage + 50) / 1.5); // Scale to 0-100
+      const percentages = {
+        Visual: total > 0
+          ? Math.round((scores.Visual / total) * 100)
+          : 0,
 
-      await completeAssessment(best[0], scores, matchPercentage, score);
+        Auditory: total > 0
+          ? Math.round((scores.Auditory / total) * 100)
+          : 0,
+
+        'Read/Write': total > 0
+          ? Math.round((scores['Read/Write'] / total) * 100)
+          : 0,
+
+        Kinesthetic: total > 0
+          ? Math.round((scores.Kinesthetic / total) * 100)
+          : 0,
+      };
+
+      const best = Object.entries(percentages)
+        .sort((a, b) => b[1] - a[1])[0];
+      const dominantStyle = best[0] as Category;
+      const matchPercentage = best[1];
+
+      await completeAssessment(
+        dominantStyle,
+        scores,
+        percentages,
+        matchPercentage
+      );
 
       setTimeout(() => {
         navigate('/dashboard/student');
